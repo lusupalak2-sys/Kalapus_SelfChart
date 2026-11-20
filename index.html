@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TaskLink – กราฟเชื่อมโยงงาน</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;600;800&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--ink:#1F2328;--mut:#5B6470;--line:#D9D6CC;--bg:#F6F5F1;--acc:#0F766E}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;display:flex;flex-direction:column;font:14px 'Noto Sans Thai',system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 16px;background:#fff;border-bottom:1px solid var(--line)}
+header h1{font-size:18px;color:var(--acc);margin:0;flex:1;min-width:90px}
+button{font:inherit;min-height:40px;padding:0 14px;border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+.hint{color:var(--mut);font-size:12px;padding:6px 16px;background:#fff;border-bottom:1px solid var(--line)}
+.sub{border:0;padding:6px 0;background:none}
+main{flex:1;display:flex;min-height:0}
+#wrap{flex:1;position:relative;min-width:0;min-height:0}
+#stage{position:absolute;inset:0;overflow:auto}
+#sz{position:relative}
+#cv{position:absolute;left:0;top:0;width:2400px;height:1600px;transform-origin:0 0;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:24px 24px}
+#ed{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.grp{position:absolute;border:2px dashed;border-radius:20px;pointer-events:none}
+.n{position:absolute;z-index:1;width:180px;height:64px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;cursor:grab;touch-action:none;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.n.sel{border:2px solid var(--acc);padding:7px 11px;box-shadow:0 4px 14px rgba(15,118,110,.2)}
+.n b{display:block;font-size:13px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.n>.row{display:flex;gap:8px;align-items:center;margin-top:5px;font-size:11px;color:var(--mut)}
+.rt{width:220px;height:60px;display:flex;align-items:center;gap:8px;padding:6px 10px;border:0;border-radius:14px;color:#fff}
+.rt.sel{border:0;padding:6px 10px;outline:3px solid var(--ink);outline-offset:2px;box-shadow:none}
+.rt b{font-size:14px;font-weight:800}
+.rt .rb{flex:1;min-width:0;font-size:11px}
+.rt .rb span{display:block}
+.rt .tg{min-height:32px;min-width:32px;padding:0;background:rgba(255,255,255,.22);border:0;color:#fff;border-radius:8px;font-size:16px}
+.c{padding:1px 8px;border-radius:99px;font-size:11px;white-space:nowrap}
+.st-w{background:#FEF3C7;color:#92400E}.st-d{background:#DBEAFE;color:#1E40AF}.st-b{background:#FEE2E2;color:#991B1B}.st-f{background:#DCFCE7;color:#166534}
+.p{position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid var(--acc);cursor:crosshair;touch-action:none;opacity:.4}
+.p::after{content:"";position:absolute;inset:-9px}
+.n.sel .p,.n:hover .p{opacity:1}
+.p[data-s=r]{right:-8px;top:calc(50% - 7px)}
+.p[data-s=l]{left:-8px;top:calc(50% - 7px)}
+.p[data-s=t]{top:-8px;left:calc(50% - 7px)}
+.p[data-s=b]{bottom:-8px;left:calc(50% - 7px)}
+.lk{border:0;background:none;min-height:32px;padding:0;color:var(--acc);text-decoration:underline;text-align:left;font:inherit;cursor:pointer}
+@keyframes fl{0%,100%{box-shadow:0 0 0 0 rgba(15,118,110,0)}50%{box-shadow:0 0 0 10px rgba(15,118,110,.35)}}
+.flash{animation:fl .85s 2}
+.pen{position:absolute;right:-12px;top:-13px;width:26px;height:26px;min-height:0;padding:0;border-radius:50%;background:var(--acc);border:2px solid #fff;color:#fff;display:grid;place-items:center}
+#zc{position:absolute;right:24px;bottom:24px;z-index:3;display:flex;align-items:center;gap:6px;width:310px;max-width:calc(100% - 32px);background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 8px}
+#zc button{min-height:40px;min-width:40px;padding:0 6px}
+#zc #zp{min-width:56px}
+#zs{flex:1;min-width:0;min-height:40px;padding:0;border:0;background:none;accent-color:var(--acc)}
+#pop{position:fixed;z-index:10;width:224px;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.18);padding:12px}
+#pop[hidden]{display:none}
+.pl{font-size:12px;font-weight:600;color:var(--mut);margin:0 0 6px}
+.sw{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.swb{width:28px;height:28px;min-height:0;padding:0;border-radius:50%;border:1px solid #B8B4A8}
+.swb.on{outline:2px solid var(--acc);outline-offset:2px}
+.seg{display:flex;gap:6px;margin-bottom:12px}
+.seg button{flex:1;min-height:36px;padding:0}
+.seg button.on{background:#E6F2F0;border-color:var(--acc);color:var(--acc)}
+aside{width:320px;background:#fff;border-left:1px solid var(--line);padding:8px 20px 20px;overflow:auto}
+label{display:block;font-size:12px;font-weight:600;color:var(--mut);margin:14px 0 4px}
+input,select{width:100%;font:inherit;min-height:40px;padding:0 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.r{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #EEECE5}
+.r>span:first-child,.r>.lk{flex:1}
+.r button{min-height:32px;padding:0 10px}
+.warn{margin-top:14px;background:#FEF3C7;color:#92400E;border-radius:10px;padding:10px 12px;line-height:1.5}
+a{color:var(--acc)}
+@media(max-width:800px){main{flex-direction:column}aside{width:auto;height:45vh;border-left:0;border-top:1px solid var(--line)}}
+#stage{touch-action:pan-x pan-y}
+#dlg{position:fixed;inset:0;z-index:20;background:rgba(31,35,40,.45);display:grid;place-items:center;padding:16px}
+#dlg[hidden]{display:none}
+#dlg .box{background:#fff;border-radius:16px;padding:20px;width:min(440px,100%);max-height:80vh;overflow:auto;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+#dlg h2{margin:0 0 6px;font-size:16px}
+#dlg p{margin:0 0 12px;color:var(--mut);line-height:1.5}
+#dlg .bt{display:block;width:100%;text-align:left;margin-top:8px;min-height:44px;line-height:1.35;padding:8px 14px}
+#dlg .bt.danger{background:#B91C1C;border-color:#B91C1C;color:#fff;font-weight:600}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:30;display:flex;align-items:center;gap:12px;background:#1F2328;color:#fff;border-radius:12px;padding:8px 8px 8px 16px;max-width:calc(100% - 32px)}
+#toast[hidden]{display:none}
+#toast button{min-height:36px}
+</style>
+</head>
+<body>
+<header>
+<h1>TaskLink</h1>
+<button id="ca">ยุบทั้งหมด</button>
+<button id="ea">ขยายทั้งหมด</button>
+<button id="tr">ถังขยะ</button>
+<button id="exp">Export Excel</button>
+<button id="addr">+ โปรเจกต์</button>
+<button id="add" class="pri">+ งานใหม่</button>
+</header>
+<div class="hint">ลากการ์ดเพื่อย้าย · ลากจุดกลมที่ขอบการ์ด (ซ้าย ขวา บน ล่าง) ไปวางบนกล่องอื่นเพื่อเชื่อม · ลากงานไปวางบนการ์ดโปรเจกต์เพื่อจัดเข้ากลุ่ม · คลิกเส้นเพื่อลบหรือเชื่อมใหม่ · ดับเบิลคลิกหรือแตะที่ว่าง 2 ครั้งเพื่อเพิ่มงาน · ถ่างสองนิ้วเพื่อซูม</div>
+<main>
+<div id="wrap">
+<div id="stage"><div id="sz"><div id="cv"><div id="grp"></div><svg id="ed" aria-hidden="true"></svg><div id="nodes"></div></div></div></div>
+<div id="zc"><button id="zo" aria-label="ซูมออก">−</button><input id="zs" type="range" min="10" max="200" step="5" value="100" aria-label="ซูม"><button id="zi" aria-label="ซูมเข้า">+</button><button id="zp" aria-label="รีเซ็ตซูม">100%</button></div>
+</div>
+<aside id="panel"></aside>
+</main>
+<div id="pop" hidden role="dialog" aria-label="ตั้งค่ากล่อง"></div>
+<div id="dlg" hidden role="dialog" aria-modal="true"></div>
+<div id="toast" hidden role="status"></div>
+<script>
+const ST={w:"รอ",d:"ทำอยู่",b:"ติดขัด",f:"เสร็จ"},KEY="tasklink-v1",W=180,H=64,RW=220,RH=60,CW=2400,CH=1600;
+const COLORS=["#FFFFFF","#FEF3C7","#DBEAFE","#DCFCE7","#FCE7F3","#EDE9FE","#FFEDD5"];
+const ROOTC=["#0F766E","#7C3AED","#B45309","#BE185D","#1D4ED8"];
+const MK=[["g","#8A8F98",9],["a","#0F766E",9],["o","#C2410C",9],["d","#6B7280",10],["r","#115E59",15],["R","#C2410C",15]];
+let D,Z=1,drag=null,tapStart=null,lastTap=null;
+try{D=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!D||!D.nodes)D={nodes:[
+{id:1,x:40,y:130,title:"เขียนเนื้อหา",status:"d",store:"Google Docs",link:"",root:7},
+{id:2,x:236,y:130,title:"วิจัยคู่แข่ง",status:"f",store:"Notion",link:"",root:7},
+{id:3,x:560,y:130,title:"ออกแบบโครงร่างเว็บ",status:"d",store:"Figma",link:"",root:8},
+{id:4,x:756,y:130,title:"เขียนโค้ดหน้าแรก",status:"b",store:"GitHub",link:"",root:8},
+{id:5,x:560,y:214,title:"เตรียมรูปภาพ",status:"w",store:"ในเครื่อง",link:"",root:8},
+{id:6,x:756,y:214,title:"ทดสอบและเปิดเว็บ",status:"w",store:"GitHub",link:"",root:8}],
+roots:[{id:7,x:40,y:40,title:"คอนเทนต์",collapsed:false,c:ROOTC[1]},{id:8,x:560,y:40,title:"เว็บไซต์",collapsed:false,c:ROOTC[0]}],
+edges:[[1,3],[2,3],[3,4],[3,5],[4,6],[5,6]],sel:3,next:9};
+D.roots=D.roots||[];D.trash=D.trash||[];D.selEdge=null;
+const $=s=>document.querySelector(s),pop=$("#pop"),cv=$("#cv");
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({...D,selEdge:null}))}catch(e){}};
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const isRoot=id=>D.roots.some(r=>r.id==id);
+const byId=id=>D.nodes.find(n=>n.id==id)||D.roots.find(r=>r.id==id);
+const rootOf=n=>n&&n.root!=null?D.roots.find(r=>r.id==n.root):null;
+const hid=id=>{const n=byId(id),r=!isRoot(id)&&rootOf(n);return !!(r&&r.collapsed)};
+const rep=id=>{const r=!isRoot(id)&&rootOf(byId(id));return r&&r.collapsed?r.id:id};
+const box=id=>{const n=byId(id);return isRoot(id)?{x:n.x,y:n.y,w:RW,h:RH}:{x:n.x,y:n.y,w:W,h:H}};
+const cl=(v,max)=>Math.max(20,Math.min(max,Math.round(v)));
+const bez=(x1,y1,x2,y2,t)=>{const u=1-t,c=[x1,x1+70,x2-70,x2],d=[y1,y1,y2,y2],f=a=>u*u*u*a[0]+3*u*u*t*a[1]+3*u*t*t*a[2]+t*t*t*a[3];return[f(c),f(d)]};
+const PEN='<button class="pen" aria-label="ตั้งค่ากล่อง" aria-haspopup="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></button>';
+const hasEdge=(a,b)=>D.edges.some(x=>x[0]==a&&x[1]==b);
+const PORTS='<i class="p" data-s="r"></i><i class="p" data-s="l"></i><i class="p" data-s="t"></i><i class="p" data-s="b"></i>';
+const SD={r:[1,0],l:[-1,0],t:[0,-1],b:[0,1]};
+const eSides=e=>[e[2]||"r",e[3]||"l"];
+
+/* รายการเส้นที่ต้องวาด: งาน-งาน / โปรเจกต์-โปรเจกต์ / เส้นสรุปเมื่อยุบ */
+function anchor(id,sd){
+  const b=box(id),d=SD[sd]||SD.r;
+  return[sd=="r"?b.x+b.w:sd=="l"?b.x:b.x+b.w/2,sd=="t"?b.y:sd=="b"?b.y+b.h:b.y+b.h/2,d[0],d[1]];
+}
+const curve=(a,b)=>[a[0],a[1],a[0]+a[2]*70,a[1]+a[3]*70,b[0]+b[2]*70,b[1]+b[3]*70,b[0],b[1]];
+const bz=(c,t)=>{const u=1-t,f=i=>u*u*u*c[i]+3*u*u*t*c[i+2]+3*u*t*t*c[i+4]+t*t*t*c[i+6];return[f(0),f(1)]};
+function nearestSide(n,x,y){
+  let best="l",bd=1e9;
+  for(const sd of["r","l","t","b"]){const a=anchor(n.id,sd),d=Math.hypot(a[0]-x,a[1]-y);if(d<bd){bd=d;best=sd}}
+  return best;
+}
+function edgeList(){
+  const L=[],dm={};
+  D.edges.forEach(e=>{
+    const[a,b]=e;
+    if(!byId(a)||!byId(b))return;
+    const ia=isRoot(a),ib=isRoot(b),sd=eSides(e);
+    if(ia&&ib){L.push({a,b,k:"rr",s:sd});return}
+    if(ia||ib)return;
+    const ra=rep(a),rb=rep(b);
+    if(ra==rb)return;
+    if(ra==a&&rb==b){L.push({a,b,k:"tt",s:sd});return}
+    const key=ra+","+rb;(dm[key]=dm[key]||{a:ra,b:rb,k:"d",n:0,s:["r","l"]}).n++;
+  });
+  Object.values(dm).forEach(d=>{if(!L.some(x=>x.k=="rr"&&x.a==d.a&&x.b==d.b))L.push(d)});
+  return L;
+}
+function drawEdges(tmp){
+  const se=D.selEdge;
+  let s='<defs>'+MK.map(([k,c,z])=>`<marker id="m${k}" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="${z}" markerHeight="${z}" orient="auto"><path d="M0 0L10 5L0 10z" fill="${c}"/></marker>`).join("")+'</defs>',ov="";
+  edgeList().forEach(E=>{
+    const c=curve(anchor(E.a,E.s[0]),anchor(E.b,E.s[1]));
+    const isS=se&&E.k!="d"&&E.a==se[0]&&E.b==se[1],h=!isS&&(E.a==D.sel||E.b==D.sel);
+    let col,w,mk;
+    if(isS){col="#C2410C";w=E.k=="rr"?6:3;mk=E.k=="rr"?"R":"o"}
+    else if(E.k=="rr"){col="#115E59";w=5;mk="r"}
+    else if(E.k=="d"){col=h?"#0F766E":"#6B7280";w=2.5;mk=h?"a":"d"}
+    else{col=h?"#0F766E":"#8A8F98";w=h?2.5:1.5;mk=h?"a":"g"}
+    const d=`M${c[0]} ${c[1]}C${c[2]} ${c[3]} ${c[4]} ${c[5]} ${c[6]} ${c[7]}`;
+    s+=`<path d="${d}" fill="none" stroke="${col}" stroke-width="${w}" marker-end="url(#m${mk})"/>`;
+    if(E.k!="d")s+=`<path d="${d}" fill="none" stroke="transparent" stroke-width="16" style="pointer-events:stroke;cursor:pointer" data-e="${E.a},${E.b}"/>`;
+    const[mx,my]=bz(c,.5);
+    if(E.k=="d"&&E.n>1)ov+=`<g style="pointer-events:none"><circle cx="${mx}" cy="${my}" r="11" fill="#fff" stroke="#6B7280" stroke-width="1.5"/><text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#1F2328">${E.n}</text></g>`;
+    if(isS){
+      const[sx,sy]=bz(c,.15),[tx,ty]=bz(c,.85);
+      const hd=(x,y,k)=>`<circle cx="${x}" cy="${y}" r="7" fill="#fff" stroke="#C2410C" stroke-width="2.5" data-h="${k}" style="pointer-events:all;cursor:grab;touch-action:none"/>`;
+      ov+=hd(sx,sy,"s")+hd(tx,ty,"t")+`<g data-del style="pointer-events:all;cursor:pointer"><circle cx="${mx}" cy="${my}" r="11" fill="#C2410C"/><text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="central" fill="#fff" font-size="16" style="pointer-events:none">×</text></g>`;
+    }
+  });
+  if(tmp)ov+=`<path d="M${tmp[0]} ${tmp[1]}L${tmp[2]} ${tmp[3]}" stroke="#0F766E" stroke-width="2" stroke-dasharray="6 5"/>`;
+  $("#ed").innerHTML=s+ov;
+}
+function drawFrames(){
+  $("#grp").innerHTML=D.roots.filter(r=>!r.collapsed).map(r=>{
+    const m=D.nodes.filter(n=>n.root==r.id);if(!m.length)return"";
+    let x0=r.x,y0=r.y,x1=r.x+RW,y1=r.y+RH;
+    m.forEach(n=>{x0=Math.min(x0,n.x);y0=Math.min(y0,n.y);x1=Math.max(x1,n.x+W);y1=Math.max(y1,n.y+H)});
+    return `<div class="grp" style="left:${x0-16}px;top:${y0-16}px;width:${x1-x0+32}px;height:${y1-y0+32}px;border-color:${r.c};background:${r.c}14"></div>`;
+  }).join("");
+}
+function renderNodes(){
+  const roots=D.roots.map(r=>{
+    const c=D.nodes.filter(n=>n.root==r.id).length;
+    return `<div class="n rt${r.id==D.sel?" sel":""}" data-id="${r.id}" style="left:${r.x}px;top:${r.y}px;background:${r.c}"><button class="tg" aria-label="${r.collapsed?"ขยาย":"ยุบ"}โปรเจกต์" aria-expanded="${!r.collapsed}">${r.collapsed?"▸":"▾"}</button><div class="rb"><b>${esc(r.title)||"(ไม่มีชื่อ)"}</b><span>${c} งาน${r.collapsed?" · ยุบอยู่":""}</span></div>${PORTS}</div>`;
+  }).join("");
+  const tasks=D.nodes.filter(n=>!hid(n.id)).map(n=>`<div class="n${n.id==D.sel?" sel":""}" data-id="${n.id}" style="left:${n.x}px;top:${n.y}px;background:${n.bg||"#fff"}"><b style="font-weight:${n.fw||600}">${esc(n.title)||"(ไม่มีชื่อ)"}</b><div class="row"><span class="c st-${n.status}">${ST[n.status]}</span><span>${esc(n.store)}</span></div>${PORTS}${n.id==D.sel?PEN:""}</div>`).join("");
+  $("#nodes").innerHTML=roots+tasks;
+  drawFrames();drawEdges();
+}
+function renderPanel(){
+  const el=$("#panel"),n=byId(D.sel),se=D.selEdge;
+  if(se){
+    const a=byId(se[0]),b=byId(se[1]);if(!a||!b){el.innerHTML="";return}
+    el.innerHTML=`<label>${isRoot(se[0])?"เส้นเชื่อมโปรเจกต์ (เส้นหนา)":"เส้นเชื่อมที่เลือก"}</label><div style="font-weight:600;line-height:1.6">${esc(a.title)} → ${esc(b.title)}</div><p style="margin-top:16px"><button id="dele">ลบเส้นเชื่อม</button></p><p class="hint sub">ลากวงกลมที่ปลายเส้นไปวางบนกล่องอื่นเพื่อเชื่อมใหม่</p>`;return;
+  }
+  if(!n){el.innerHTML='<p class="hint sub" style="padding:12px 0">คลิกการ์ดหรือเส้นเชื่อมเพื่อดูและแก้ไข</p>';return}
+  if(isRoot(n.id)){
+    const mem=D.nodes.filter(m=>m.root==n.id),conn={};
+    D.edges.forEach(([a,b])=>{
+      const A=byId(a),B=byId(b);if(!A||!B)return;
+      const ra=isRoot(a)?a:A.root,rb=isRoot(b)?b:B.root;
+      if(ra==null||rb==null||ra==rb||(ra!=n.id&&rb!=n.id))return;
+      const o=ra==n.id?rb:ra,c=conn[o]=conn[o]||{t:0,r:0};
+      isRoot(a)?c.r++:c.t++;
+    });
+    const cr=Object.entries(conn).map(([o,c])=>`<div class="r"><button class="lk" data-go="${o}">${esc(byId(+o).title)}</button><span class="c" style="background:#EEECE5">${c.t?c.t+" เส้นระหว่างงาน":""}${c.t&&c.r?" · ":""}${c.r?"เชื่อมโดยตรง":""}</span></div>`).join("")||'<div class="hint sub">ยังไม่มี</div>';
+    el.innerHTML=`<label for="t">ชื่อโปรเจกต์</label><input id="t" value="${esc(n.title)}">
+<p style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button id="tog">${n.collapsed?"ขยายโปรเจกต์":"ยุบโปรเจกต์"}</button><button id="addin">+ เพิ่มงานในโปรเจกต์</button></p>
+<label>งานในโปรเจกต์ (${mem.length})</label>${mem.map(m=>`<div class="r"><button class="lk" data-go="${m.id}">${esc(m.title)}</button><span class="c st-${m.status}">${ST[m.status]}</span></div>`).join("")||'<div class="hint sub">ยังไม่มีงาน ลากงานมาวางบนการ์ดนี้ได้</div>'}
+<label>เชื่อมกับโปรเจกต์อื่น</label>${cr}
+<p class="hint sub">เชื่อมโปรเจกต์ตรง ๆ: ลากจุดกลมขวาของการ์ดไปวางบนโปรเจกต์อื่น (เส้นหนา)</p>
+<p style="margin-top:12px"><button id="del">ลบโปรเจกต์…</button></p>`;return;
+  }
+  const up=D.edges.filter(e=>e[1]==n.id).map(e=>byId(e[0])).filter(m=>m&&!isRoot(m.id));
+  const dn=D.edges.filter(e=>e[0]==n.id).map(e=>byId(e[1])).filter(m=>m&&!isRoot(m.id));
+  const rows=(l,down)=>l.map(m=>`<div class="r"><button class="lk" data-go="${m.id}">${esc(m.title)}</button><span class="c st-${m.status}">${ST[m.status]}</span><button data-rm="${down?n.id+","+m.id:m.id+","+n.id}" aria-label="ลบเส้นเชื่อม">×</button></div>`).join("")||'<div class="hint sub">ยังไม่มี</div>';
+  const wait=up.filter(m=>m.status!="f"),stuck=dn.filter(m=>m.status=="b");
+  let warn="";
+  if(n.status!="f"&&wait.length)warn+=`<div class="warn">ยังรอให้เสร็จก่อน: ${wait.map(m=>"“"+esc(m.title)+"”").join(", ")}</div>`;
+  if(stuck.length)warn+=`<div class="warn">งานที่ติดขัดเพราะรองานนี้: ${stuck.map(m=>"“"+esc(m.title)+"”").join(", ")}</div>`;
+  const stores=[...new Set(D.nodes.map(x=>x.store).filter(Boolean))];
+  el.innerHTML=`<label for="t">ชื่องาน</label><input id="t" value="${esc(n.title)}">
+<label for="s">สถานะ</label><select id="s">${Object.entries(ST).map(([k,v])=>`<option value="${k}"${k==n.status?" selected":""}>${v}</option>`).join("")}</select>
+<label for="pr">อยู่ในโปรเจกต์</label><select id="pr"><option value="">— ไม่อยู่ในโปรเจกต์ —</option>${D.roots.map(r=>`<option value="${r.id}"${r.id==n.root?" selected":""}>${esc(r.title)}</option>`).join("")}</select>
+<label for="o">ข้อมูลอยู่ที่</label><input id="o" list="stores" value="${esc(n.store)}" placeholder="เช่น Google Drive, Notion">
+<datalist id="stores">${stores.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
+<label for="l">ลิงก์หรือที่อยู่ไฟล์</label><input id="l" value="${esc(n.link)}">
+${/^https?:\/\//.test(n.link)?`<a href="${esc(n.link)}" target="_blank" rel="noopener">เปิดลิงก์</a>`:""}
+${warn}
+<label>ต้องเสร็จก่อน (${up.length})</label>${rows(up,false)}
+<label>งานที่รอผลจากงานนี้ (${dn.length})</label>${rows(dn,true)}
+<p style="margin-top:20px"><button id="del">ลบงานนี้</button></p>`;
+}
+
+/* เลือกกล่อง / เส้น */
+function sel(id,edge){
+  const same=id!=null&&D.sel==id&&!D.selEdge;
+  D.sel=id;D.selEdge=edge||null;
+  document.querySelectorAll(".n").forEach(e=>{
+    const on=e.dataset.id==id,p=e.querySelector(".pen"),rt=e.classList.contains("rt");
+    e.classList.toggle("sel",on);
+    if(on&&!p&&!rt)e.insertAdjacentHTML("beforeend",PEN);
+    if(!on&&p)p.remove();
+  });
+  if(!same)closePop();
+  drawEdges();if(!same)renderPanel();
+}
+const pt=e=>{const r=cv.getBoundingClientRect();return[(e.clientX-r.left)/Z,(e.clientY-r.top)/Z]};
+const inBox=(n,x,y)=>{const b=box(n.id);return x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h};
+const nodeAt=(x,y,skip)=>[...D.roots,...D.nodes.filter(n=>!hid(n.id))].reverse().find(n=>n.id!=skip&&inBox(n,x,y));
+
+/* โปรเจกต์: จัดงานเข้ากลุ่ม ยุบ/ขยาย */
+function assign(t,r){
+  const mem=D.nodes.filter(n=>n.root==r.id&&n.id!=t.id);
+  t.root=r.id;
+  for(let k=0;k<90;k++){
+    const sx=r.x+(k%3)*196,sy=r.y+RH+24+Math.floor(k/3)*84;
+    if(!mem.some(m=>Math.abs(m.x-sx)<W+8&&Math.abs(m.y-sy)<H+8)){t.x=cl(sx,CW-W);t.y=cl(sy,CH-H);return}
+  }
+}
+function goTo(id){
+  const n=byId(id);if(!n)return;
+  if(hid(id)){rootOf(n).collapsed=false;renderNodes()}
+  sel(id);
+  const st=$("#stage"),b=box(id);
+  st.scrollTo({left:Math.max(0,(b.x+b.w/2)*Z-st.clientWidth/2),top:Math.max(0,(b.y+b.h/2)*Z-st.clientHeight/2),behavior:"smooth"});
+  const el=document.querySelector(`.n[data-id="${id}"]`);
+  if(el){el.classList.add("flash");setTimeout(()=>el.classList.remove("flash"),1700)}
+  $("#panel").scrollTop=0;save();
+}
+function frameRect(r){
+  let x0=r.x,y0=r.y,x1=r.x+RW,y1=r.y+RH;
+  D.nodes.filter(n=>n.root==r.id).forEach(n=>{x0=Math.min(x0,n.x);y0=Math.min(y0,n.y);x1=Math.max(x1,n.x+W);y1=Math.max(y1,n.y+H)});
+  return{x0:x0-16,y0:y0-16,x1:x1+16,y1:y1+16};
+}
+function dropRoot(t,px,py){
+  const cx=t.x+W/2,cy=t.y+H/2;
+  return D.roots.find(r=>{
+    if(r.id==t.root)return false;
+    const ox=Math.min(t.x+W,r.x+RW)-Math.max(t.x,r.x),oy=Math.min(t.y+H,r.y+RH)-Math.max(t.y,r.y);
+    if(ox>0&&oy>0&&ox*oy>=.2*W*H)return true;
+    if(inBox(r,px,py))return true;
+    if(r.collapsed)return false;
+    const f=frameRect(r);return cx>=f.x0&&cx<=f.x1&&cy>=f.y0&&cy<=f.y1;
+  });
+}
+function cleanSel(){
+  if(D.sel!=null&&hid(D.sel))D.sel=byId(D.sel).root;
+  if(D.selEdge&&(hid(D.selEdge[0])||hid(D.selEdge[1])))D.selEdge=null;
+}
+function collapse(v,id){
+  D.roots.forEach(r=>{if(id==null||r.id==id)r.collapsed=v});
+  cleanSel();closePop();renderNodes();renderPanel();save();
+}
+function addRoot(){
+  const s=$("#stage"),k=D.roots.length;
+  const r={id:D.next++,x:cl(s.scrollLeft/Z+60+k*30,CW-RW),y:cl(s.scrollTop/Z+50+k*30,CH-RH),title:"โปรเจกต์ใหม่",collapsed:false,c:ROOTC[k%ROOTC.length]};
+  D.roots.push(r);renderNodes();sel(r.id);save();
+  const t=$("#t");if(t){t.focus();t.select()}
+}
+function addNode(x,y,root){
+  const n={id:D.next++,x:cl(x,CW-W),y:cl(y,CH-H),title:"งานใหม่",status:"w",store:"",link:"",root:null};
+  D.nodes.push(n);if(root)assign(n,root);
+  renderNodes();sel(n.id);save();
+  const t=$("#t");if(t){t.focus();t.select()}
+}
+/* ถังขยะ / กู้คืน / กล่องโต้ตอบ */
+const clone=o=>JSON.parse(JSON.stringify(o));
+const dlg=$("#dlg");let tt;
+function updTrash(){$("#tr").textContent="ถังขยะ"+(D.trash.length?` (${D.trash.length})`:"")}
+function toTrash(it){it.at=Date.now();D.trash.unshift(it);D.trash=D.trash.slice(0,50);updTrash()}
+function edgesOf(ids){return D.edges.filter(x=>x.some(i=>ids.includes(i))).map(x=>x.slice())}
+function dropEdges(ids){D.edges=D.edges.filter(x=>!x.some(i=>ids.includes(i)))}
+function toast(msg){
+  const t=$("#toast");t.innerHTML=`<span>${esc(msg)}</span><button data-act="undo">กู้คืน</button>`;t.hidden=false;
+  clearTimeout(tt);tt=setTimeout(()=>{t.hidden=true},7000);
+}
+$("#toast").addEventListener("click",e=>{if(e.target.dataset.act=="undo"){restore(0);$("#toast").hidden=true}});
+function afterDel(msg){D.sel=null;D.selEdge=null;closePop();renderNodes();renderPanel();save();toast(msg)}
+function delNode(id){
+  const n=byId(id);if(!n||isRoot(id))return;
+  toTrash({t:"task",node:clone(n),edges:edgesOf([id])});
+  D.nodes=D.nodes.filter(m=>m.id!=id);dropEdges([id]);
+  afterDel("ลบ “"+n.title+"” แล้ว");
+}
+function delRoot(id,withTasks){
+  const r=byId(id);if(!r||!isRoot(id))return;
+  const mem=D.nodes.filter(n=>n.root==id);
+  if(withTasks){
+    const ids=[id,...mem.map(m=>m.id)];
+    toTrash({t:"group",root:clone(r),nodes:clone(mem),edges:edgesOf(ids)});
+    D.nodes=D.nodes.filter(n=>n.root!=id);dropEdges(ids);
+  }else{
+    toTrash({t:"root",root:clone(r),mem:mem.map(m=>m.id),edges:edgesOf([id])});
+    mem.forEach(m=>{m.root=null});dropEdges([id]);
+  }
+  D.roots=D.roots.filter(x=>x.id!=id);
+  afterDel(withTasks?"ลบโปรเจกต์ “"+r.title+"” พร้อมงานแล้ว":"ลบโปรเจกต์ “"+r.title+"” แล้ว งานยังอยู่");
+}
+function restore(i){
+  const it=D.trash[i];if(!it)return;
+  if(it.t=="task"){
+    if(!byId(it.node.id)){if(it.node.root!=null&&!isRoot(it.node.root))it.node.root=null;D.nodes.push(it.node)}
+  }else if(it.t=="group"){
+    if(!byId(it.root.id))D.roots.push(it.root);
+    it.nodes.forEach(n=>{if(!byId(n.id))D.nodes.push(n)});
+  }else{
+    if(!byId(it.root.id))D.roots.push(it.root);
+    it.mem.forEach(id=>{const n=byId(id);if(n&&!isRoot(id)&&n.root==null)n.root=it.root.id});
+  }
+  it.edges.forEach(e=>{if(byId(e[0])&&byId(e[1])&&!hasEdge(e[0],e[1]))D.edges.push(e)});
+  D.trash.splice(i,1);updTrash();renderNodes();renderPanel();save();
+}
+function openDlg(h){dlg.innerHTML=`<div class="box">${h}</div>`;dlg.hidden=false;const b=dlg.querySelector("button");if(b)b.focus()}
+function closeDlg(){dlg.hidden=true}
+function askDelRoot(id){
+  const r=byId(id),c=D.nodes.filter(n=>n.root==id).length;
+  openDlg(`<h2>ลบโปรเจกต์ “${esc(r.title)}”</h2><p>มี ${c} งานในโปรเจกต์นี้ สิ่งที่ลบจะอยู่ในถังขยะและกู้คืนได้</p>
+<button class="bt danger" data-act="rdall" data-id="${id}">ลบโปรเจกต์พร้อมงานทั้งหมด (${c} งาน)</button>
+<button class="bt" data-act="rkeep" data-id="${id}">ลบเฉพาะโปรเจกต์ งานทั้งหมดเด้งออกมาอยู่ข้างนอก เส้นเชื่อมยังอยู่</button>
+<button class="bt" data-act="cx">ยกเลิก</button>`);
+}
+function openTrash(){
+  const rows=D.trash.map((it,i)=>{
+    const nm=it.t=="task"?"งาน: "+it.node.title:it.t=="group"?"โปรเจกต์: "+it.root.title+" + "+it.nodes.length+" งาน":"โปรเจกต์: "+it.root.title;
+    return `<div class="r"><span>${esc(nm)}<br><small style="color:var(--mut)">${new Date(it.at).toLocaleString("th-TH",{dateStyle:"short",timeStyle:"short"})}</small></span><button data-act="rs" data-i="${i}">กู้คืน</button><button data-act="rm" data-i="${i}">ลบถาวร</button></div>`;
+  }).join("")||"<p>ถังขยะว่างเปล่า</p>";
+  openDlg(`<h2>ถังขยะ</h2><p>งานและโปรเจกต์ที่ลบแล้วกู้คืนได้ที่นี่</p>${rows}${D.trash.length?'<button class="bt" data-act="clr">ล้างถังขยะทั้งหมด</button>':""}<button class="bt" data-act="cx">ปิด</button>`);
+}
+dlg.addEventListener("click",e=>{
+  if(e.target===dlg){closeDlg();return}
+  const b=e.target.closest("[data-act]");if(!b)return;
+  const a=b.dataset.act,i=+b.dataset.i,id=+b.dataset.id;
+  if(a=="cx")closeDlg();
+  else if(a=="rdall"){closeDlg();delRoot(id,true)}
+  else if(a=="rkeep"){closeDlg();delRoot(id,false)}
+  else if(a=="rs"){restore(i);openTrash()}
+  else if(a=="rm"){D.trash.splice(i,1);updTrash();save();openTrash()}
+  else if(a=="clr"){D.trash=[];updTrash();save();openTrash()}
+});
+$("#tr").onclick=openTrash;
+function delEdge(){
+  const e=D.selEdge;if(!e)return;
+  D.edges=D.edges.filter(x=>!(x[0]==e[0]&&x[1]==e[1]));sel(null);save();
+}
+$("#add").onclick=()=>{
+  const s=$("#stage"),k=D.nodes.length%6,r=isRoot(D.sel)?byId(D.sel):null;
+  addNode(s.scrollLeft/Z+60+k*24,s.scrollTop/Z+60+k*24,r);
+};
+$("#addr").onclick=addRoot;
+$("#ca").onclick=()=>collapse(true);
+$("#ea").onclick=()=>collapse(false);
+
+/* ลากย้าย / ลากเชื่อม / เชื่อมใหม่ */
+cv.addEventListener("pointerdown",e=>{
+  const t=e.target;
+  if(t.closest(".pen")){e.preventDefault();pop.hidden?openPop():closePop();return}
+  const tg=t.closest(".tg");
+  if(tg){e.preventDefault();collapse(!byId(+tg.closest(".n").dataset.id).collapsed,+tg.closest(".n").dataset.id);return}
+  const h=t.closest("[data-h]");
+  if(h&&D.selEdge){drag={k:"re",end:h.dataset.h,edge:(D.edges.find(z=>z[0]==D.selEdge[0]&&z[1]==D.selEdge[1])||D.selEdge).slice()};e.preventDefault();return}
+  if(t.closest("[data-del]")){delEdge();return}
+  const eh=t.closest("[data-e]");
+  if(eh){sel(null,eh.dataset.e.split(",").map(Number));e.preventDefault();return}
+  const n=t.closest(".n");
+  if(!n){tapStart={x:e.clientX,y:e.clientY,p:pt(e)};sel(null);return}
+  const id=+n.dataset.id,node=byId(id),[x,y]=pt(e);
+  const pp=t.closest(".p");drag=pp?{k:"link",id,side:pp.dataset.s}:{k:"move",id,dx:x-node.x,dy:y-node.y};
+  e.preventDefault();sel(id);
+});
+addEventListener("pointermove",e=>{
+  if(!drag)return;
+  const[x,y]=pt(e);
+  if(drag.k=="move"){
+    const n=byId(drag.id),rt=isRoot(n.id);
+    const nx=cl(x-drag.dx,CW-(rt?RW:W)),ny=cl(y-drag.dy,CH-(rt?RH:H)),ddx=nx-n.x,ddy=ny-n.y;
+    (rt?[n,...D.nodes.filter(m=>m.root==n.id)]:[n]).forEach(m=>{
+      if(m===n){m.x=nx;m.y=ny}else{m.x=cl(m.x+ddx,CW-W);m.y=cl(m.y+ddy,CH-H)}
+      const el=document.querySelector(`.n[data-id="${m.id}"]`);
+      if(el){el.style.left=m.x+"px";el.style.top=m.y+"px"}
+    });
+    drawEdges();drawFrames();
+  }else if(drag.k=="link"){const A=anchor(drag.id,drag.side);drawEdges([A[0],A[1],x,y])}
+  else{
+    const sd=eSides(drag.edge),A=anchor(drag.edge[0],sd[0]),B=anchor(drag.edge[1],sd[1]);
+    drawEdges(drag.end=="t"?[A[0],A[1],x,y]:[x,y,B[0],B[1]]);
+  }
+});
+addEventListener("pointercancel",()=>{tapStart=null});
+addEventListener("pointerup",e=>{
+  if(tapStart){
+    const ts=tapStart;tapStart=null;
+    if(!drag&&!pz&&Math.hypot(e.clientX-ts.x,e.clientY-ts.y)<12){
+      const now=Date.now();
+      if(lastTap&&now-lastTap.t<450&&Math.hypot(lastTap.x-e.clientX,lastTap.y-e.clientY)<40){lastTap=null;addNode(ts.p[0]-W/2,ts.p[1]-H/2)}
+      else lastTap={t:now,x:e.clientX,y:e.clientY};
+    }
+  }
+  if(!drag)return;
+  const[x,y]=pt(e);
+  if(drag.k=="link"){
+    const m=nodeAt(x,y,drag.id);
+    if(m&&isRoot(m.id)==isRoot(drag.id)&&!hasEdge(drag.id,m.id)){D.edges.push([drag.id,m.id,drag.side,nearestSide(m,x,y)]);renderPanel()}
+    drawEdges();
+  }else if(drag.k=="re"){
+    const[a,b]=drag.edge,sd=eSides(drag.edge),m=nodeAt(x,y);
+    const ne=m&&(drag.end=="t"?[a,m.id,sd[0],nearestSide(m,x,y)]:[m.id,b,nearestSide(m,x,y),sd[1]]);
+    if(ne&&ne[0]!=ne[1]&&isRoot(ne[0])==isRoot(ne[1])&&((ne[0]==a&&ne[1]==b)||!hasEdge(ne[0],ne[1]))){
+      const i=D.edges.findIndex(z=>z[0]==a&&z[1]==b);
+      if(i>=0){D.edges[i]=ne;D.selEdge=[ne[0],ne[1]]}
+    }
+    drawEdges();renderPanel();
+  }else if(!isRoot(drag.id)){
+    const t=byId(drag.id),r=dropRoot(t,x,y);
+    if(r&&t.root!=r.id){assign(t,r);renderNodes();renderPanel()}
+  }
+  save();drag=null;
+});
+
+/* ป๊อปอัปตั้งค่ากล่อง (ไอคอนดินสอ) */
+function fillPop(){
+  const n=byId(D.sel);if(!n||isRoot(n.id))return closePop();
+  const bg=(n.bg||"#FFFFFF").toUpperCase(),fw=n.fw||600;
+  pop.innerHTML=`<p class="pl">สีกล่อง</p><div class="sw">${COLORS.map(c=>`<button class="swb${bg==c?" on":""}" data-bg="${c}" style="background:${c}" aria-label="สี ${c}" aria-pressed="${bg==c}"></button>`).join("")}</div><p class="pl">ตัวอักษรในกล่อง</p><div class="seg">${[[300,"บาง"],[600,"ปกติ"],[800,"หนา"]].map(([v,t])=>`<button data-fw="${v}" class="${fw==v?"on":""}" aria-pressed="${fw==v}" style="font-weight:${v}">${t}</button>`).join("")}</div><button data-pdel style="width:100%">ลบกล่องนี้</button>`;
+}
+function openPop(){
+  const el=document.querySelector(`.n[data-id="${D.sel}"]`);if(!el)return;
+  fillPop();pop.hidden=false;
+  const r=el.getBoundingClientRect();
+  pop.style.left=Math.max(8,Math.min(r.right+16,innerWidth-236))+"px";
+  pop.style.top=Math.max(8,Math.min(r.top-6,innerHeight-220))+"px";
+}
+function closePop(){pop.hidden=true}
+pop.addEventListener("click",e=>{
+  const n=byId(D.sel),b=e.target.closest("button");if(!n||!b)return;
+  if(b.dataset.bg)n.bg=b.dataset.bg;
+  else if(b.dataset.fw)n.fw=+b.dataset.fw;
+  else if(b.dataset.pdel!==undefined){closePop();delNode(D.sel);return}
+  else return;
+  renderNodes();fillPop();save();
+});
+document.addEventListener("pointerdown",e=>{if(!e.target.closest("#pop,.pen"))closePop()});
+$("#stage").addEventListener("scroll",closePop);
+
+/* ซูม: ลากแถบเปอร์เซ็นต์ หรือกดปุ่ม */
+function setZoom(z,ax,ay){
+  const s=$("#stage"),r=s.getBoundingClientRect();
+  if(ax==null){ax=r.left+r.width/2;ay=r.top+r.height/2}
+  const px=(s.scrollLeft+ax-r.left)/Z,py=(s.scrollTop+ay-r.top)/Z;
+  Z=Math.max(.1,Math.min(2,Math.round(z*100)/100));
+  $("#sz").style.width=CW*Z+"px";$("#sz").style.height=CH*Z+"px";
+  cv.style.transform=`scale(${Z})`;
+  s.scrollLeft=px*Z-(ax-r.left);s.scrollTop=py*Z-(ay-r.top);
+  $("#zp").textContent=Math.round(Z*100)+"%";$("#zs").value=Math.round(Z*100);closePop();
+}
+$("#zs").addEventListener("input",e=>setZoom(e.target.value/100));
+$("#zi").onclick=()=>setZoom(Z+.1);
+$("#zo").onclick=()=>setZoom(Z-.1);
+$("#zp").onclick=()=>setZoom(1);
+$("#stage").addEventListener("wheel",e=>{
+  if(e.ctrlKey||e.metaKey){e.preventDefault();setZoom(Z*(e.deltaY<0?1.1:1/1.1),e.clientX,e.clientY)}
+},{passive:false});
+
+/* ซูมด้วยสองนิ้ว (pinch) */
+let pz=null;
+const tdist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+const stg=$("#stage");
+stg.addEventListener("touchstart",e=>{
+  if(e.touches.length==2){tapStart=null;lastTap=null;if(drag){save();drag=null}closePop();pz={d:tdist(e.touches),z:Z}}
+},{passive:false});
+stg.addEventListener("touchmove",e=>{
+  if(pz&&e.touches.length==2){
+    if(e.cancelable)e.preventDefault();
+    const t=e.touches;
+    setZoom(pz.z*tdist(t)/pz.d,(t[0].clientX+t[1].clientX)/2,(t[0].clientY+t[1].clientY)/2);
+  }
+},{passive:false});
+stg.addEventListener("touchend",e=>{if(e.touches.length<2)pz=null});
+stg.addEventListener("touchcancel",()=>{pz=null});
+document.addEventListener("gesturestart",e=>e.preventDefault());
+
+/* แผงรายละเอียด */
+const P=$("#panel");
+P.addEventListener("input",e=>{
+  const n=byId(D.sel),f={t:"title",o:"store",l:"link"}[e.target.id];
+  if(n&&f){n[f]=e.target.value;renderNodes();save()}
+});
+P.addEventListener("change",e=>{
+  const n=byId(D.sel);if(!n)return;
+  if(e.target.id=="s"){n.status=e.target.value;renderNodes();renderPanel();save()}
+  if(e.target.id=="pr"){
+    const v=e.target.value;
+    if(v==="")n.root=null;else assign(n,byId(+v));
+    renderNodes();renderPanel();save();
+  }
+});
+P.addEventListener("click",e=>{
+  const g=e.target.closest("[data-go]");
+  if(g){goTo(+g.dataset.go);return}
+  const r=e.target.closest("[data-rm]");
+  if(r){const[a,b]=r.dataset.rm.split(",").map(Number);D.edges=D.edges.filter(x=>!(x[0]==a&&x[1]==b));drawEdges();renderPanel();save()}
+  const id=e.target.id;
+  if(id=="del"&&D.sel!=null)isRoot(D.sel)?askDelRoot(D.sel):delNode(D.sel);
+  if(id=="dele")delEdge();
+  if(id=="tog")collapse(!byId(D.sel).collapsed,D.sel);
+  if(id=="addin"){const s=byId(D.sel);addNode(s.x,s.y,s)}
+});
+addEventListener("keydown",e=>{
+  if(e.target.matches("input,select,textarea"))return;
+  if(e.key=="Escape"){closePop();closeDlg()}
+  if(e.key=="Delete"||e.key=="Backspace"){
+    if(D.selEdge)delEdge();else if(D.sel!=null)isRoot(D.sel)?askDelRoot(D.sel):delNode(D.sel);
+  }
+});
+
+/* Export เป็น Excel (เปิดใน Google Sheets ได้) */
+$("#exp").onclick=()=>{
+  if(!window.XLSX){alert("โหลดไลบรารี Excel ไม่สำเร็จ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่");return}
+  const t=id=>(byId(id)||{}).title||"",cnt={};
+  D.nodes.forEach(n=>{const k=n.store||"(ไม่ระบุ)";cnt[k]=(cnt[k]||0)+1});
+  const wb=XLSX.utils.book_new(),add=(name,rows)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),name);
+  add("งาน",[["ชื่องาน","สถานะ","โปรเจกต์","ที่เก็บข้อมูล","ลิงก์"],...D.nodes.map(n=>[n.title,ST[n.status],(rootOf(n)||{}).title||"",n.store,n.link])]);
+  add("ความเชื่อมโยง",[["ประเภท","ต้นทาง","ปลายทาง"],...D.edges.map(e=>[isRoot(e[0])?"โปรเจกต์-โปรเจกต์":"งาน-งาน",t(e[0]),t(e[1])])]);
+  add("โปรเจกต์",[["ชื่อโปรเจกต์","จำนวนงาน"],...D.roots.map(r=>[r.title,D.nodes.filter(n=>n.root==r.id).length])]);
+  add("ที่เก็บข้อมูล",[["ชื่อ","จำนวนงาน"],...Object.entries(cnt)]);
+  XLSX.writeFile(wb,"tasklink.xlsx");
+};
+
+setZoom(1);renderNodes();renderPanel();updTrash();
+</script>
+</body>
+</html>
