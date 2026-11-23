@@ -21,7 +21,7 @@ main{flex:1;display:flex;min-height:0}
 #wrap{flex:1;position:relative;min-width:0;min-height:0}
 #stage{position:absolute;inset:0;overflow:auto}
 #sz{position:relative}
-#cv{position:absolute;left:0;top:0;width:2400px;height:1600px;transform-origin:0 0;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:24px 24px}
+#cv{position:absolute;left:0;top:0;width:2400px;height:3000px;transform-origin:0 0;background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:24px 24px}
 #ed{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:0}
 .grp{position:absolute;border:2px dashed;border-radius:20px;pointer-events:none}
 .n{position:absolute;z-index:1;width:180px;height:64px;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;cursor:grab;touch-action:none;user-select:none;box-shadow:0 1px 2px rgba(0,0,0,.05)}
@@ -67,6 +67,8 @@ input,select{width:100%;font:inherit;min-height:40px;padding:0 10px;border:1px s
 .r>span:first-child,.r>.lk{flex:1}
 .r button{min-height:32px;padding:0 10px}
 .warn{margin-top:14px;background:#FEF3C7;color:#92400E;border-radius:10px;padding:10px 12px;line-height:1.5}
+textarea{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;resize:vertical;background:#fff;color:var(--ink)}
+textarea:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
 a{color:var(--acc)}
 @media(max-width:800px){main{flex-direction:column}aside{width:auto;height:45vh;border-left:0;border-top:1px solid var(--line)}}
 #stage{touch-action:pan-x pan-y}
@@ -88,6 +90,7 @@ a{color:var(--acc)}
 <button id="ca">ยุบทั้งหมด</button>
 <button id="ea">ขยายทั้งหมด</button>
 <button id="tr">ถังขยะ</button>
+<button id="imp">Import Excel</button><input id="imf" type="file" accept=".xlsx,.xls,.csv" hidden>
 <button id="exp">Export Excel</button>
 <button id="addr">+ โปรเจกต์</button>
 <button id="add" class="pri">+ งานใหม่</button>
@@ -104,11 +107,12 @@ a{color:var(--acc)}
 <div id="dlg" hidden role="dialog" aria-modal="true"></div>
 <div id="toast" hidden role="status"></div>
 <script>
-const ST={w:"รอ",d:"ทำอยู่",b:"ติดขัด",f:"เสร็จ"},KEY="tasklink-v1",W=180,H=64,RW=220,RH=60,CW=2400,CH=1600;
+const ST={w:"รอ",d:"ทำอยู่",b:"ติดขัด",f:"เสร็จ"},KEY="tasklink-v1",W=180,H=64,RW=220,RH=60,CW=2400,CH=3000;
 const COLORS=["#FFFFFF","#FEF3C7","#DBEAFE","#DCFCE7","#FCE7F3","#EDE9FE","#FFEDD5"];
 const ROOTC=["#0F766E","#7C3AED","#B45309","#BE185D","#1D4ED8"];
+const ROOTX=[...ROOTC,"#334155","#B91C1C","#15803D"];
 const MK=[["g","#8A8F98",9],["a","#0F766E",9],["o","#C2410C",9],["d","#6B7280",10],["r","#115E59",15],["R","#C2410C",15]];
-let D,Z=1,drag=null,tapStart=null,lastTap=null;
+let D,Z=1,drag=null,tapStart=null,lastTap=null,impBackup=null,pendingMove=null,pendingImport=null;
 try{D=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!D||!D.nodes)D={nodes:[
 {id:1,x:40,y:130,title:"เขียนเนื้อหา",status:"d",store:"Google Docs",link:"",root:7},
@@ -201,7 +205,7 @@ function drawFrames(){
 function renderNodes(){
   const roots=D.roots.map(r=>{
     const c=D.nodes.filter(n=>n.root==r.id).length;
-    return `<div class="n rt${r.id==D.sel?" sel":""}" data-id="${r.id}" style="left:${r.x}px;top:${r.y}px;background:${r.c}"><button class="tg" aria-label="${r.collapsed?"ขยาย":"ยุบ"}โปรเจกต์" aria-expanded="${!r.collapsed}">${r.collapsed?"▸":"▾"}</button><div class="rb"><b>${esc(r.title)||"(ไม่มีชื่อ)"}</b><span>${c} งาน${r.collapsed?" · ยุบอยู่":""}</span></div>${PORTS}</div>`;
+    return `<div class="n rt${r.id==D.sel?" sel":""}" data-id="${r.id}" style="left:${r.x}px;top:${r.y}px;background:${r.c}"><button class="tg" aria-label="${r.collapsed?"ขยาย":"ยุบ"}โปรเจกต์" aria-expanded="${!r.collapsed}">${r.collapsed?"▸":"▾"}</button><div class="rb"><b style="font-weight:${r.fw||800}">${esc(r.title)||"(ไม่มีชื่อ)"}</b><span>${c} งาน${r.collapsed?" · ยุบอยู่":""}</span></div>${PORTS}${r.id==D.sel?PEN:""}</div>`;
   }).join("");
   const tasks=D.nodes.filter(n=>!hid(n.id)).map(n=>`<div class="n${n.id==D.sel?" sel":""}" data-id="${n.id}" style="left:${n.x}px;top:${n.y}px;background:${n.bg||"#fff"}"><b style="font-weight:${n.fw||600}">${esc(n.title)||"(ไม่มีชื่อ)"}</b><div class="row"><span class="c st-${n.status}">${ST[n.status]}</span><span>${esc(n.store)}</span></div>${PORTS}${n.id==D.sel?PEN:""}</div>`).join("");
   $("#nodes").innerHTML=roots+tasks;
@@ -246,6 +250,7 @@ function renderPanel(){
 <datalist id="stores">${stores.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>
 <label for="l">ลิงก์หรือที่อยู่ไฟล์</label><input id="l" value="${esc(n.link)}">
 ${/^https?:\/\//.test(n.link)?`<a href="${esc(n.link)}" target="_blank" rel="noopener">เปิดลิงก์</a>`:""}
+<label for="nt">บันทึก</label><textarea id="nt" rows="3" placeholder="จดบันทึกสั้น ๆ">${esc(n.note)}</textarea>
 ${warn}
 <label>ต้องเสร็จก่อน (${up.length})</label>${rows(up,false)}
 <label>งานที่รอผลจากงานนี้ (${dn.length})</label>${rows(dn,true)}
@@ -259,7 +264,7 @@ function sel(id,edge){
   document.querySelectorAll(".n").forEach(e=>{
     const on=e.dataset.id==id,p=e.querySelector(".pen"),rt=e.classList.contains("rt");
     e.classList.toggle("sel",on);
-    if(on&&!p&&!rt)e.insertAdjacentHTML("beforeend",PEN);
+    if(on&&!p)e.insertAdjacentHTML("beforeend",PEN);
     if(!on&&p)p.remove();
   });
   if(!same)closePop();
@@ -277,6 +282,40 @@ function assign(t,r){
     const sx=r.x+(k%3)*196,sy=r.y+RH+24+Math.floor(k/3)*84;
     if(!mem.some(m=>Math.abs(m.x-sx)<W+8&&Math.abs(m.y-sy)<H+8)){t.x=cl(sx,CW-W);t.y=cl(sy,CH-H);return}
   }
+}
+function linked(t){
+  const seen=new Set([t.id]),q=[t.id];
+  while(q.length){
+    const c=q.pop();
+    D.edges.forEach(e=>{
+      if(isRoot(e[0])||isRoot(e[1]))return;
+      const o=e[0]==c?e[1]:e[1]==c?e[0]:null;
+      if(o!=null&&!seen.has(o)&&byId(o)){seen.add(o);q.push(o)}
+    });
+  }
+  seen.delete(t.id);return[...seen].map(byId);
+}
+function moveToRoot(t,r,ox,oy){
+  const others=linked(t).filter(m=>m.root!=r.id);
+  if(!others.length){assign(t,r);renderNodes();renderPanel();save();return}
+  pendingMove={t:t.id,r:r.id,o:others.map(m=>m.id),ox,oy};
+  const nm=others.slice(0,6).map(m=>"“"+esc(m.title)+"”").join(", ")+(others.length>6?" …":"");
+  openDlg(`<h2>ย้ายเข้า “${esc(r.title)}”</h2><p>“${esc(t.title)}” มีงานที่เชื่อมกันอยู่อีก ${others.length} งาน: ${nm}</p>
+<button class="bt" style="background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600" data-act="mvall">ย้ายงานที่เชื่อมกันทั้งหมด (${others.length+1} งาน)</button>
+<button class="bt" data-act="mvone">ย้ายเฉพาะ “${esc(t.title)}”</button>
+<button class="bt" data-act="cx">ยกเลิก (ไม่ย้าย)</button>`);
+}
+function doMove(pm,all){
+  const r=byId(pm.r),t=byId(pm.t);if(!r||!t)return;
+  assign(t,r);
+  if(all)pm.o.forEach(id=>{const m=byId(id);if(m)assign(m,r)});
+  renderNodes();renderPanel();save();
+}
+function cancelMove(){
+  const pm=pendingMove;pendingMove=null;if(!pm)return;
+  const t=byId(pm.t);
+  if(t&&pm.ox!=null){t.x=pm.ox;t.y=pm.oy;renderNodes()}
+  renderPanel();save();
 }
 function goTo(id){
   const n=byId(id);if(!n)return;
@@ -331,11 +370,17 @@ function updTrash(){$("#tr").textContent="ถังขยะ"+(D.trash.length?` 
 function toTrash(it){it.at=Date.now();D.trash.unshift(it);D.trash=D.trash.slice(0,50);updTrash()}
 function edgesOf(ids){return D.edges.filter(x=>x.some(i=>ids.includes(i))).map(x=>x.slice())}
 function dropEdges(ids){D.edges=D.edges.filter(x=>!x.some(i=>ids.includes(i)))}
-function toast(msg){
-  const t=$("#toast");t.innerHTML=`<span>${esc(msg)}</span><button data-act="undo">กู้คืน</button>`;t.hidden=false;
-  clearTimeout(tt);tt=setTimeout(()=>{t.hidden=true},7000);
+function toast(msg,act,label){
+  act=act||"undo";label=label||"กู้คืน";
+  const t=$("#toast");t.innerHTML=`<span>${esc(msg)}</span><button data-act="${act}">${label}</button>`;t.hidden=false;
+  clearTimeout(tt);tt=setTimeout(()=>{t.hidden=true},9000);
 }
-$("#toast").addEventListener("click",e=>{if(e.target.dataset.act=="undo"){restore(0);$("#toast").hidden=true}});
+$("#toast").addEventListener("click",e=>{
+  const a=e.target.dataset.act;if(!a)return;
+  if(a=="undo")restore(0);
+  if(a=="unimp"&&impBackup){D=JSON.parse(impBackup);D.selEdge=null;impBackup=null;updTrash();renderNodes();renderPanel();save()}
+  $("#toast").hidden=true;
+});
 function afterDel(msg){D.sel=null;D.selEdge=null;closePop();renderNodes();renderPanel();save();toast(msg)}
 function delNode(id){
   const n=byId(id);if(!n||isRoot(id))return;
@@ -372,7 +417,7 @@ function restore(i){
   D.trash.splice(i,1);updTrash();renderNodes();renderPanel();save();
 }
 function openDlg(h){dlg.innerHTML=`<div class="box">${h}</div>`;dlg.hidden=false;const b=dlg.querySelector("button");if(b)b.focus()}
-function closeDlg(){dlg.hidden=true}
+function closeDlg(){dlg.hidden=true;cancelMove()}
 function askDelRoot(id){
   const r=byId(id),c=D.nodes.filter(n=>n.root==id).length;
   openDlg(`<h2>ลบโปรเจกต์ “${esc(r.title)}”</h2><p>มี ${c} งานในโปรเจกต์นี้ สิ่งที่ลบจะอยู่ในถังขยะและกู้คืนได้</p>
@@ -392,6 +437,8 @@ dlg.addEventListener("click",e=>{
   const b=e.target.closest("[data-act]");if(!b)return;
   const a=b.dataset.act,i=+b.dataset.i,id=+b.dataset.id;
   if(a=="cx")closeDlg();
+  else if(a=="impgo"){const P=pendingImport,u=!!(dlg.querySelector("#impupd")||{}).checked;pendingImport=null;closeDlg();applyImport(P,u)}
+  else if(a=="mvall"||a=="mvone"){const pm=pendingMove;pendingMove=null;closeDlg();doMove(pm,a=="mvall")}
   else if(a=="rdall"){closeDlg();delRoot(id,true)}
   else if(a=="rkeep"){closeDlg();delRoot(id,false)}
   else if(a=="rs"){restore(i);openTrash()}
@@ -425,7 +472,7 @@ cv.addEventListener("pointerdown",e=>{
   const n=t.closest(".n");
   if(!n){tapStart={x:e.clientX,y:e.clientY,p:pt(e)};sel(null);return}
   const id=+n.dataset.id,node=byId(id),[x,y]=pt(e);
-  const pp=t.closest(".p");drag=pp?{k:"link",id,side:pp.dataset.s}:{k:"move",id,dx:x-node.x,dy:y-node.y};
+  const pp=t.closest(".p");drag=pp?{k:"link",id,side:pp.dataset.s}:{k:"move",id,dx:x-node.x,dy:y-node.y,ox:node.x,oy:node.y};
   e.preventDefault();sel(id);
 });
 addEventListener("pointermove",e=>{
@@ -472,16 +519,17 @@ addEventListener("pointerup",e=>{
     drawEdges();renderPanel();
   }else if(!isRoot(drag.id)){
     const t=byId(drag.id),r=dropRoot(t,x,y);
-    if(r&&t.root!=r.id){assign(t,r);renderNodes();renderPanel()}
+    if(r&&t.root!=r.id)moveToRoot(t,r,drag.ox,drag.oy);
   }
   save();drag=null;
 });
 
 /* ป๊อปอัปตั้งค่ากล่อง (ไอคอนดินสอ) */
 function fillPop(){
-  const n=byId(D.sel);if(!n||isRoot(n.id))return closePop();
-  const bg=(n.bg||"#FFFFFF").toUpperCase(),fw=n.fw||600;
-  pop.innerHTML=`<p class="pl">สีกล่อง</p><div class="sw">${COLORS.map(c=>`<button class="swb${bg==c?" on":""}" data-bg="${c}" style="background:${c}" aria-label="สี ${c}" aria-pressed="${bg==c}"></button>`).join("")}</div><p class="pl">ตัวอักษรในกล่อง</p><div class="seg">${[[300,"บาง"],[600,"ปกติ"],[800,"หนา"]].map(([v,t])=>`<button data-fw="${v}" class="${fw==v?"on":""}" aria-pressed="${fw==v}" style="font-weight:${v}">${t}</button>`).join("")}</div><button data-pdel style="width:100%">ลบกล่องนี้</button>`;
+  const n=byId(D.sel);if(!n)return closePop();
+  const rt=isRoot(n.id),cols=rt?ROOTX:COLORS,cur=rt?n.c:(n.bg||"#FFFFFF").toUpperCase(),fw=n.fw||(rt?800:600);
+  const ws=[[rt?400:300,"บาง"],[600,"ปกติ"],[800,"หนา"]];
+  pop.innerHTML=`<p class="pl">${rt?"สีการ์ดโปรเจกต์":"สีกล่อง"}</p><div class="sw">${cols.map(c=>`<button class="swb${cur==c?" on":""}" data-bg="${c}" style="background:${c}" aria-label="สี ${c}" aria-pressed="${cur==c}"></button>`).join("")}</div><p class="pl">ตัวอักษร${rt?"ชื่อโปรเจกต์":"ในกล่อง"}</p><div class="seg">${ws.map(([v,t])=>`<button data-fw="${v}" class="${fw==v?"on":""}" aria-pressed="${fw==v}" style="font-weight:${v}">${t}</button>`).join("")}</div><button data-pdel style="width:100%">${rt?"ลบโปรเจกต์…":"ลบกล่องนี้"}</button>`;
 }
 function openPop(){
   const el=document.querySelector(`.n[data-id="${D.sel}"]`);if(!el)return;
@@ -493,9 +541,9 @@ function openPop(){
 function closePop(){pop.hidden=true}
 pop.addEventListener("click",e=>{
   const n=byId(D.sel),b=e.target.closest("button");if(!n||!b)return;
-  if(b.dataset.bg)n.bg=b.dataset.bg;
+  if(b.dataset.bg){if(isRoot(n.id))n.c=b.dataset.bg;else n.bg=b.dataset.bg}
   else if(b.dataset.fw)n.fw=+b.dataset.fw;
-  else if(b.dataset.pdel!==undefined){closePop();delNode(D.sel);return}
+  else if(b.dataset.pdel!==undefined){closePop();isRoot(n.id)?askDelRoot(n.id):delNode(n.id);return}
   else return;
   renderNodes();fillPop();save();
 });
@@ -542,7 +590,7 @@ document.addEventListener("gesturestart",e=>e.preventDefault());
 /* แผงรายละเอียด */
 const P=$("#panel");
 P.addEventListener("input",e=>{
-  const n=byId(D.sel),f={t:"title",o:"store",l:"link"}[e.target.id];
+  const n=byId(D.sel),f={t:"title",o:"store",l:"link",nt:"note"}[e.target.id];
   if(n&&f){n[f]=e.target.value;renderNodes();save()}
 });
 P.addEventListener("change",e=>{
@@ -550,8 +598,7 @@ P.addEventListener("change",e=>{
   if(e.target.id=="s"){n.status=e.target.value;renderNodes();renderPanel();save()}
   if(e.target.id=="pr"){
     const v=e.target.value;
-    if(v==="")n.root=null;else assign(n,byId(+v));
-    renderNodes();renderPanel();save();
+    if(v===""){n.root=null;renderNodes();renderPanel();save()}else moveToRoot(n,byId(+v));
   }
 });
 P.addEventListener("click",e=>{
@@ -573,13 +620,117 @@ addEventListener("keydown",e=>{
   }
 });
 
+/* Import จากไฟล์ Excel ที่ export ไว้ */
+const norm=s=>String(s==null?"":s).trim().replace(/\s+/g," ").toLowerCase();
+const SMAP={"รอ":"w","ทำอยู่":"d","ติดขัด":"b","เสร็จ":"f"};
+const cell=(r,k)=>String(r[k]==null?"":r[k]).trim();
+const noLib=()=>openDlg('<h2>โหลดไลบรารี Excel ไม่สำเร็จ</h2><p>กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่</p><button class="bt" data-act="cx">ปิด</button>');
+function parseImport(wb){
+  const T=[],E=[],R=[];
+  wb.SheetNames.forEach(nm=>{
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[nm],{defval:""});
+    if(!rows.length)return;
+    const h=rows[0];
+    if("ชื่องาน" in h)T.push(...rows);
+    else if("ต้นทาง" in h&&"ปลายทาง" in h)E.push(...rows);
+    else if("ชื่อโปรเจกต์" in h)R.push(...rows);
+  });
+  const haveT=new Set(D.nodes.map(n=>norm(n.title))),haveR=new Set(D.roots.map(r=>norm(r.title)));
+  const P={roots:[],tasks:[],dup:0,upd:[],edges:[],bad:0,skipE:0},newR=new Set(),newT=new Set(),seenU=new Set();
+  const exist=new Map();D.nodes.forEach(n=>{const k=norm(n.title);if(!exist.has(k))exist.set(k,n)});
+  const addR=name=>{const k=norm(name);if(!k||haveR.has(k)||newR.has(k))return;newR.add(k);P.roots.push({title:name.trim()})};
+  R.forEach(r=>addR(cell(r,"ชื่อโปรเจกต์")));
+  T.forEach(r=>{
+    const name=cell(r,"ชื่องาน"),k=norm(name);if(!k)return;
+    if(haveT.has(k)||newT.has(k)){
+      P.dup++;
+      const ex=haveT.has(k)&&exist.get(k);
+      if(ex&&!seenU.has(k)){
+        seenU.add(k);
+        const ch={},st=SMAP[cell(r,"สถานะ")];
+        if(st&&st!=ex.status)ch.status=st;
+        [["store","ที่เก็บข้อมูล"],["link","ลิงก์"],["note","บันทึก"]].forEach(([f,c])=>{const v=cell(r,c);if(v&&v!=(ex[f]||""))ch[f]=v});
+        const pj=cell(r,"โปรเจกต์");
+        if(pj&&norm(pj)!=norm((rootOf(ex)||{}).title))ch.proj=pj;
+        if(Object.keys(ch).length)P.upd.push({id:ex.id,ch});
+      }
+      return;
+    }
+    const proj=cell(r,"โปรเจกต์");if(proj)addR(proj);
+    newT.add(k);
+    P.tasks.push({title:name,status:SMAP[cell(r,"สถานะ")]||"w",store:cell(r,"ที่เก็บข้อมูล"),link:cell(r,"ลิงก์"),note:cell(r,"บันทึก"),proj});
+  });
+  const isT=k=>haveT.has(k)||newT.has(k),isR=k=>haveR.has(k)||newR.has(k),seen=new Set();
+  E.forEach(r=>{
+    const a=norm(cell(r,"ต้นทาง")),b=norm(cell(r,"ปลายทาง")),ty=cell(r,"ประเภท");
+    if(!a||!b||a==b)return;
+    const kind=/โปรเจกต์/.test(ty)?"r":ty?"t":(isT(a)&&isT(b)?"t":"r");
+    if(!(kind=="t"?isT(a)&&isT(b):isR(a)&&isR(b))){P.bad++;return}
+    const key=kind+"|"+a+"|"+b;if(seen.has(key))return;seen.add(key);
+    const pool=kind=="t"?D.nodes:D.roots,ea=pool.find(n=>norm(n.title)==a),eb=pool.find(n=>norm(n.title)==b);
+    if(ea&&eb&&hasEdge(ea.id,eb.id)){P.skipE++;return}
+    P.edges.push({kind,a,b});
+  });
+  return P;
+}
+function showImport(P){
+  const n=P.roots.length+P.tasks.length+P.edges.length,u=P.upd.length;
+  const extra=`พบงานที่มีอยู่แล้ว ${P.dup}${P.bad?` · ข้ามเส้นที่หาชื่อไม่เจอ ${P.bad}`:""}`;
+  if(!n&&!u){openDlg(`<h2>ไม่มีอะไรใหม่ให้นำเข้า</h2><p>${extra} (ข้อมูลตรงกับไฟล์แล้ว)</p><button class="bt" data-act="cx">ปิด</button>`);return}
+  pendingImport=P;
+  const opt=u?`<label style="display:flex;gap:10px;align-items:flex-start;margin:0 0 12px;font-size:13px;font-weight:400;color:var(--ink);line-height:1.5"><input id="impupd" type="checkbox"${n?"":" checked"} style="width:22px;min-height:22px;padding:0;margin:2px 0 0;flex:none"><span>อัปเดตงานที่ซ้ำด้วยข้อมูลจากไฟล์ (${u} งานที่ข้อมูลต่างกัน: สถานะ ที่เก็บข้อมูล ลิงก์ บันทึก โปรเจกต์) ช่องที่ว่างในไฟล์จะไม่ทับข้อมูลเดิม ถ้าไม่ติ๊ก จะข้ามงานซ้ำทั้งหมด</span></label>`:"";
+  openDlg(`<h2>นำเข้าจากไฟล์</h2><p>โปรเจกต์ใหม่ ${P.roots.length} · งานใหม่ ${P.tasks.length} · เส้นเชื่อมใหม่ ${P.edges.length}<br>${extra}</p>${opt}
+<button class="bt" style="background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600" data-act="impgo">นำเข้าเลย</button>
+<button class="bt" data-act="cx">ยกเลิก</button>`);
+}
+function applyImport(P,upd){
+  impBackup=JSON.stringify(D);
+  let maxY=0;[...D.roots.map(r=>r.y+RH),...D.nodes.map(n=>n.y+H)].forEach(v=>{maxY=Math.max(maxY,v)});
+  const rootBy=new Map(D.roots.map(r=>[norm(r.title),r])),taskBy=new Map(D.nodes.map(n=>[norm(n.title),n]));
+  const cnt=o=>P.tasks.filter(t=>norm(t.proj)==norm(o.title)).length;
+  const rowH=60+24+84*Math.ceil(Math.max(1,...P.roots.map(cnt))/3)+90;
+  const y0=maxY?maxY+110:40;
+  P.roots.forEach((o,i)=>{
+    const r={id:D.next++,x:40+(i%3)*680,y:y0+Math.floor(i/3)*rowH,title:o.title,collapsed:false,c:ROOTC[D.roots.length%ROOTC.length]};
+    D.roots.push(r);rootBy.set(norm(o.title),r);
+  });
+  const freeY=y0+Math.ceil(P.roots.length/3)*rowH;let k=0;
+  P.tasks.forEach(o=>{
+    const n={id:D.next++,x:40+(k%5)*200,y:freeY,title:o.title,status:o.status,store:o.store,link:o.link,note:o.note,root:null};
+    D.nodes.push(n);taskBy.set(norm(o.title),n);
+    const r=o.proj&&rootBy.get(norm(o.proj));
+    if(r)assign(n,r);else{n.y=freeY+Math.floor(k/5)*84;k++}
+  });
+  let nu=0;
+  if(upd)P.upd.forEach(u=>{
+    const n=byId(u.id);if(!n)return;
+    const{proj,...f}=u.ch;Object.assign(n,f);
+    if(proj){const r=rootBy.get(norm(proj));if(r&&n.root!=r.id)assign(n,r)}
+    nu++;
+  });
+  P.edges.forEach(e=>{
+    const m=e.kind=="t"?taskBy:rootBy,A=m.get(e.a),B=m.get(e.b);
+    if(A&&B&&!hasEdge(A.id,B.id))D.edges.push([A.id,B.id]);
+  });
+  D.sel=null;D.selEdge=null;renderNodes();renderPanel();save();
+  $("#stage").scrollTo({top:Math.max(0,(y0-60)*Z),behavior:"smooth"});
+  toast(`นำเข้าแล้ว: โปรเจกต์ ${P.roots.length} · งาน ${P.tasks.length} · เส้น ${P.edges.length}${nu?` · อัปเดต ${nu} งาน`:""}`,"unimp","เลิกนำเข้า");
+}
+$("#imp").onclick=()=>$("#imf").click();
+$("#imf").onchange=async e=>{
+  const f=e.target.files[0];e.target.value="";if(!f)return;
+  if(!window.XLSX){noLib();return}
+  try{showImport(parseImport(XLSX.read(await f.arrayBuffer(),{type:"array"})))}
+  catch(err){openDlg('<h2>อ่านไฟล์ไม่ได้</h2><p>กรุณาเลือกไฟล์ .xlsx หรือ .csv ที่ export จาก TaskLink</p><button class="bt" data-act="cx">ปิด</button>')}
+};
+
 /* Export เป็น Excel (เปิดใน Google Sheets ได้) */
 $("#exp").onclick=()=>{
-  if(!window.XLSX){alert("โหลดไลบรารี Excel ไม่สำเร็จ กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่");return}
+  if(!window.XLSX){noLib();return}
   const t=id=>(byId(id)||{}).title||"",cnt={};
   D.nodes.forEach(n=>{const k=n.store||"(ไม่ระบุ)";cnt[k]=(cnt[k]||0)+1});
   const wb=XLSX.utils.book_new(),add=(name,rows)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),name);
-  add("งาน",[["ชื่องาน","สถานะ","โปรเจกต์","ที่เก็บข้อมูล","ลิงก์"],...D.nodes.map(n=>[n.title,ST[n.status],(rootOf(n)||{}).title||"",n.store,n.link])]);
+  add("งาน",[["ชื่องาน","สถานะ","โปรเจกต์","ที่เก็บข้อมูล","ลิงก์","บันทึก"],...D.nodes.map(n=>[n.title,ST[n.status],(rootOf(n)||{}).title||"",n.store,n.link,n.note||""])]);
   add("ความเชื่อมโยง",[["ประเภท","ต้นทาง","ปลายทาง"],...D.edges.map(e=>[isRoot(e[0])?"โปรเจกต์-โปรเจกต์":"งาน-งาน",t(e[0]),t(e[1])])]);
   add("โปรเจกต์",[["ชื่อโปรเจกต์","จำนวนงาน"],...D.roots.map(r=>[r.title,D.nodes.filter(n=>n.root==r.id).length])]);
   add("ที่เก็บข้อมูล",[["ชื่อ","จำนวนงาน"],...Object.entries(cnt)]);
